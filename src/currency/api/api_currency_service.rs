@@ -61,20 +61,41 @@ impl CurrencyService for ApiCurrencyService {
     }
 }
 
+/// Represents freecurrencyapi validation error
+/// https://freecurrencyapi.com/docs/status-codes#validation-errors
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ApiValidationError {
+    message: String,
+    errors: HashMap<String, Vec<String>>,
+    info: String,
+}
+
 impl ApiCurrencyService {
     async fn process_request(&self, request: &str) -> Result<ApiResponse, CurrencyServiceError> {
         let response = self.client.get(&request).await;
 
-        if let Err(e) = response {
-            return match e {
-                HttpError::ValidationError(e) => {
-                    todo!();
-                    Err(CurrencyServiceError::Other("todo".to_string()))
+        if let Err(http_error) = response {
+            return match http_error {
+                HttpError::ValidationError(http_error_str) => {
+                    match serde_json::from_str::<ApiValidationError>(&http_error_str) {
+                        Ok(e) => {
+                            if e.errors.contains_key("base_currency") {
+                                Err(CurrencyServiceError::SourceCurrencyError)
+                            } else if e.errors.contains_key("currencies") {
+                                Err(CurrencyServiceError::TargetCurrencyError)
+                            } else {
+                                Err(CurrencyServiceError::Other(http_error_str))
+                            }
+                        }
+                        Err(e) => Err(CurrencyServiceError::Other(e.to_string())),
+                    }
                 }
                 HttpError::UnexpectedError(_)
                 | HttpError::NetworkError
                 | HttpError::AuthorizationError
-                | HttpError::RateLimitError => Err(CurrencyServiceError::Other(e.to_string())),
+                | HttpError::RateLimitError => {
+                    Err(CurrencyServiceError::Other(http_error.to_string()))
+                }
             };
         }
 
