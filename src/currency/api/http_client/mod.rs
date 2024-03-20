@@ -16,7 +16,7 @@ where
 
 #[derive(Debug)]
 pub enum HttpError {
-    NetworkError,
+    NetworkError(Box<dyn Error>),
     AuthorizationError,
     RateLimitError,
     ValidationError(String),

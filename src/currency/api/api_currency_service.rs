@@ -91,7 +91,7 @@ impl ApiCurrencyService {
                     }
                 }
                 HttpError::UnexpectedError(_)
-                | HttpError::NetworkError
+                | HttpError::NetworkError(_)
                 | HttpError::AuthorizationError
                 | HttpError::RateLimitError => {
                     Err(CurrencyServiceError::Other(http_error.to_string()))

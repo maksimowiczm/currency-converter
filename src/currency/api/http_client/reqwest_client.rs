@@ -38,7 +38,7 @@ impl HttpClient<String> for ReqwestClient<String> {
                     format!("Unexpected response HTTP status code {code}").into(),
                 )),
             },
-            Err(_) => Err(HttpError::NetworkError),
+            Err(e) => Err(HttpError::NetworkError(Box::new(e))),
         }?;
 
         // parse response to string
