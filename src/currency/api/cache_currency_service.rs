@@ -82,7 +82,7 @@ mod tests {
     const BASE_CURRENCY: &str = "USD";
 
     #[tokio::test]
-    async fn get_exchange_rates_use_cached_value_if_available() {
+    async fn get_exchange_rates_use_cached_values() {
         let mut cache_mock = MockCache::new();
         let cached = r#"{"PLN":4.1,"EUR":0.9}"#.to_string();
         cache_mock
@@ -108,7 +108,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_exchange_rates_calls_wrapped_if_not_cached_and_stored_value_in_cache() {
+    async fn get_exchange_rates_without_cached_values() {
         let mut cache_mock = MockCache::new();
         cache_mock
             .expect_get()
@@ -151,4 +151,6 @@ mod tests {
         let eur = result.get("EUR").unwrap();
         assert_eq!(*eur, 0.9f64)
     }
+
+    // more tests
 }
