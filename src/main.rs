@@ -8,6 +8,7 @@ use currency::api::cache_currency_service::CacheCurrencyService;
 use currency::api::http_client::reqwest_client::ReqwestClient;
 use currency::currency_service::CurrencyService;
 use fred::prelude::{Builder, ClientLike, RedisConfig};
+use log::info;
 use std::env;
 
 #[derive(Parser)]
@@ -28,6 +29,8 @@ struct Arguments {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::init();
+
     let args = Arguments::parse();
 
     let source_currency_code = args
@@ -78,12 +81,14 @@ async fn setup_service(
     let service: Box<dyn CurrencyService> = if let Some(client) = client_option {
         match client.init().await {
             Ok(_) => {
+                info!("Using Redis as cache service");
                 let redis_cache = RedisCache::new(client);
                 Box::new(CacheCurrencyService::new(Box::new(redis_cache), service))
             }
             Err(_) => service,
         }
     } else {
+        info!("Using cacheless service");
         service
     };
 

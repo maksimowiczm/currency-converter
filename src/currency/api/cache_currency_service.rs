@@ -1,6 +1,7 @@
 use crate::api::cache::cache::Cache;
 use crate::currency_service::{CurrencyService, CurrencyServiceError};
 use async_trait::async_trait;
+use log::info;
 use std::collections::HashMap;
 
 pub struct CacheCurrencyService {
@@ -51,6 +52,7 @@ impl CurrencyService for CacheCurrencyService {
         let key = source_currency_code.to_string();
         if let Ok(Some(cached)) = self.cache.get(key.clone()).await {
             if let Ok(exchange_rate) = serde_json::from_str::<HashMap<String, f64>>(&cached) {
+                info!("Cache hit with key = {key:?}");
                 return Ok(exchange_rate);
             }
         }
@@ -63,9 +65,10 @@ impl CurrencyService for CacheCurrencyService {
         let json = serde_json::to_string(&rates)
             .or_else(|e| Err(CurrencyServiceError::Other(e.to_string())))?;
 
-        if let Err(e) = self.cache.set(key, json).await {
+        if let Err(e) = self.cache.set(key.clone(), json).await {
             Err(CurrencyServiceError::Other(e.to_string()))
         } else {
+            info!("Stored key = {key:?}");
             Ok(rates)
         }
     }

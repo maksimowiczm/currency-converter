@@ -23,3 +23,5 @@ serde = { version = "1.0.197", features = ["derive"] }
 reqwest = "0.11.26"
 mockall = { version = "0.12.1" }
 fred = { version = "8.0" }
+log = "0.4.21"
+env_logger = "0.11.3"
