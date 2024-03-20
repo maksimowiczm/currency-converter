@@ -1,11 +1,16 @@
 pub mod reqwest_client;
 
 use async_trait::async_trait;
+use mockall::automock;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+#[automock]
 #[async_trait]
-pub trait HttpClient<T>: Send + Sync {
+pub trait HttpClient<T>: Send + Sync
+where
+    T: Send + Sync,
+{
     async fn get(&self, url: &str) -> Result<T, HttpError>;
 }
 

@@ -107,3 +107,102 @@ impl ApiCurrencyService {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::http_client::MockHttpClient;
+    use mockall::predicate;
+
+    const API_URL: &str = "url";
+    const API_KEY: &str = "key";
+    const BASE_CURRENCY: &str = "USD";
+
+    const SOURCE_CURRENCY_VALIDATION_ERROR_JSON: &str = r#"{"message":"Validation error","errors":{"base_currency":["The selected base currency is invalid."]},"info":""}"#;
+    const TARGET_CURRENCY_VALIDATION_ERROR_JSON: &str = r#"{"message":"Validation error","errors":{"currencies":["The selected currencies is invalid."]},"info":""}"#;
+
+    #[tokio::test]
+    async fn valid_json_returns_ok_result_with_valid_exchange_rate() {
+        // arrange
+        let mut http_mock = MockHttpClient::new();
+        let expected_request = format!(
+            "{}?apikey={}&base_currency={}",
+            API_URL, API_KEY, BASE_CURRENCY
+        );
+        let response = "{\"data\": {\"PLN\": 4.001}}".to_string();
+        http_mock
+            .expect_get()
+            .with(predicate::eq(expected_request))
+            .times(1)
+            .returning(move |_| Ok(response.to_string()));
+
+        // act
+        let service = ApiCurrencyService::new(API_URL.into(), API_KEY.into(), Box::new(http_mock));
+
+        // assert
+        let result = service.get_exchange_rates(BASE_CURRENCY).await;
+
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert!(result.contains_key("PLN"));
+        assert_eq!(*result.get("PLN").unwrap(), 4.001f64);
+    }
+
+    #[tokio::test]
+    async fn http_client_validation_error_source_currency_error_returns_source_currency_error() {
+        // arrange
+        let mut http_mock = MockHttpClient::new();
+        let expected_request = format!(
+            "{}?apikey={}&base_currency={}",
+            API_URL, API_KEY, BASE_CURRENCY
+        );
+        http_mock
+            .expect_get()
+            .with(predicate::eq(expected_request))
+            .times(1)
+            .returning(move |_| {
+                Err(HttpError::ValidationError(
+                    SOURCE_CURRENCY_VALIDATION_ERROR_JSON.to_string(),
+                ))
+            });
+
+        // act
+        let service = ApiCurrencyService::new(API_URL.into(), API_KEY.into(), Box::new(http_mock));
+
+        // arrange
+        let result = service.get_exchange_rates(BASE_CURRENCY).await;
+
+        assert!(result.is_err());
+        assert_eq!(result, Err(CurrencyServiceError::SourceCurrencyError));
+    }
+
+    #[tokio::test]
+    async fn http_client_validation_error_target_currency_error_returns_target_currency_error() {
+        // arrange
+        let mut http_mock = MockHttpClient::new();
+        let expected_request = format!(
+            "{}?apikey={}&base_currency={}",
+            API_URL, API_KEY, BASE_CURRENCY
+        );
+        http_mock
+            .expect_get()
+            .with(predicate::eq(expected_request))
+            .times(1)
+            .returning(move |_| {
+                Err(HttpError::ValidationError(
+                    TARGET_CURRENCY_VALIDATION_ERROR_JSON.to_string(),
+                ))
+            });
+
+        // act
+        let service = ApiCurrencyService::new(API_URL.into(), API_KEY.into(), Box::new(http_mock));
+
+        // assert
+        let result = service.get_exchange_rates(BASE_CURRENCY).await;
+
+        assert!(result.is_err());
+        assert_eq!(result, Err(CurrencyServiceError::TargetCurrencyError));
+    }
+
+    // more tests with mocked http client
+}

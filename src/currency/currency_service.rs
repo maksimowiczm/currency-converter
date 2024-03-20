@@ -17,7 +17,7 @@ pub trait CurrencyService: Send + Sync {
     ) -> Result<HashMap<String, f64>, CurrencyServiceError>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum CurrencyServiceError {
     SourceCurrencyError,
     TargetCurrencyError,
