@@ -3,7 +3,11 @@ mod currency_command;
 use crate::currency_command::CurrencyCommand;
 use clap::Parser;
 use currency::api::api_currency_service::ApiCurrencyService;
+use currency::api::cache::redis_cache::RedisCache;
+use currency::api::cache_currency_service::CacheCurrencyService;
 use currency::api::http_client::reqwest_client::ReqwestClient;
+use currency::currency_service::CurrencyService;
+use fred::prelude::{Builder, ClientLike, RedisConfig};
 use std::env;
 
 #[derive(Parser)]
@@ -44,13 +48,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let api_url = env::var("API_URL").unwrap_or("https://api.freecurrencyapi.com/v1/latest".into());
-    let http_client = Box::new(ReqwestClient::new());
-    let service = ApiCurrencyService::new(api_url, args.api_key, http_client);
-
-    let result = command.execute(Box::new(service)).await?;
+    let service = setup_service(args.api_key).await?;
+    let result = command.execute(service).await?;
 
     println!("{result}");
 
     Ok(())
+}
+
+async fn setup_service(
+    api_key: String,
+) -> Result<Box<dyn CurrencyService>, Box<dyn std::error::Error>> {
+    let api_url = env::var("API_URL").unwrap_or("https://api.freecurrencyapi.com/v1/latest".into());
+    let http_client = Box::new(ReqwestClient::new());
+
+    // create cacheless service
+    let service = Box::new(ApiCurrencyService::new(
+        api_url,
+        api_key.to_string(),
+        http_client,
+    ));
+
+    let client_option = env::var("REDIS_URL")
+        .ok()
+        .and_then(|url| RedisConfig::from_url(&url).ok())
+        .and_then(|config| Builder::from_config(config).build().ok());
+
+    // try creating service with cache
+    let service: Box<dyn CurrencyService> = if let Some(client) = client_option {
+        match client.init().await {
+            Ok(_) => {
+                let redis_cache = RedisCache::new(client);
+                Box::new(CacheCurrencyService::new(Box::new(redis_cache), service))
+            }
+            Err(_) => service,
+        }
+    } else {
+        service
+    };
+
+    Ok(service)
 }
