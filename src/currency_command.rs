@@ -30,7 +30,9 @@ impl CurrencyCommand {
 
                 let rows = vec
                     .iter()
-                    .map(|(key, exchange_rate)| format!("{key} = {exchange_rate}\n"))
+                    .map(|(key, exchange_rate)| {
+                        format!("{key} = {}\n", round4(**exchange_rate))
+                    })
                     .collect::<String>();
 
                 format!(
@@ -51,10 +53,17 @@ impl CurrencyCommand {
                     )
                     .await?;
 
+                let exchange_rate = round4(exchange_rate);
+
                 format!("{} {}", amount * exchange_rate, exchange_rate)
             }
         };
 
         Ok(result)
     }
+}
+
+fn round4(num: f64) -> f64 {
+    let rounded = (num * 10000.).round() / 10000.;
+    rounded
 }
