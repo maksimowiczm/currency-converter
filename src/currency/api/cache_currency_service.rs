@@ -29,18 +29,21 @@ impl CurrencyService for CacheCurrencyService {
         let key = Self::create_cache_key(source_currency_code, target_currency_code);
         if let Ok(Some(cached)) = self.cache.get(key.clone()).await {
             if let Ok(exchange_rate) = serde_json::from_str::<f64>(&cached) {
+                info!("Cache hit with key = {key:?}");
                 return Ok(exchange_rate);
             }
         }
 
+        info!("Cache miss with key = {key:?}");
         let exchange_rate = self
             .wrapped
             .get_currency_exchange_rate(source_currency_code, target_currency_code)
             .await?;
 
-        if let Err(e) = self.cache.set(key, exchange_rate.to_string()).await {
+        if let Err(e) = self.cache.set(key.clone(), exchange_rate.to_string()).await {
             Err(CurrencyServiceError::Other(e.to_string()))
         } else {
+            info!("Stored key = {key:?}");
             Ok(exchange_rate)
         }
     }
@@ -57,6 +60,7 @@ impl CurrencyService for CacheCurrencyService {
             }
         }
 
+        info!("Cache miss with key = {key:?}");
         let rates = self
             .wrapped
             .get_exchange_rates(source_currency_code)

@@ -85,7 +85,10 @@ async fn setup_service(
                 let redis_cache = RedisCache::new(client);
                 Box::new(CacheCurrencyService::new(Box::new(redis_cache), service))
             }
-            Err(_) => service,
+            Err(_) => {
+                info!("Using cacheless service");
+                service
+            },
         }
     } else {
         info!("Using cacheless service");

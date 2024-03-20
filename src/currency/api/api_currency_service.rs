@@ -3,6 +3,7 @@ use crate::currency_service::{CurrencyService, CurrencyServiceError};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use log::info;
 
 pub struct ApiCurrencyService {
     api_url: String,
@@ -38,6 +39,7 @@ impl CurrencyService for ApiCurrencyService {
         );
 
         let response = self.process_request(&request).await?;
+        info!("Fetched {source_currency_code}-{target_currency_code}");
 
         match response.data.get(target_currency_code) {
             Some(value) => Ok(*value),
@@ -56,6 +58,7 @@ impl CurrencyService for ApiCurrencyService {
         );
 
         let response = self.process_request(&request).await?;
+        info!("Fetched {source_currency_code}");
 
         Ok(response.data)
     }
