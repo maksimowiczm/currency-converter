@@ -14,6 +14,8 @@ name = "currency"
 path = "src/currency/lib.rs"
 
 [dependencies]
+tokio = { version = "1.36.0", features = ["full"] }
 async-trait = "0.1.78"
 serde_json = "1.0.114"
 serde = { version = "1.0.197", features = ["derive"] }
+reqwest = "0.11.26"

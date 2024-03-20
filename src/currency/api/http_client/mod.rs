@@ -1,3 +1,5 @@
+pub mod reqwest_client;
+
 use async_trait::async_trait;
 use std::error::Error;
 use std::fmt::{Display, Formatter};

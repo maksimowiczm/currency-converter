@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-struct ApiCurrencyService {
+pub struct ApiCurrencyService {
     api_url: String,
     api_key: String,
     client: Box<dyn HttpClient<String>>,
