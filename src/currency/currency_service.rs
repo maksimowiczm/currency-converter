@@ -1,8 +1,10 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
+use std::error::Error;
+use std::fmt::{Display, Formatter};
 
 #[async_trait]
-pub trait CurrencyService {
+pub trait CurrencyService: Send + Sync {
     async fn get_currency_exchange_rate(
         &self,
         source_currency_code: &str,
@@ -21,3 +23,11 @@ pub enum CurrencyServiceError {
     TargetCurrencyError,
     Other(String),
 }
+
+impl Display for CurrencyServiceError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl Error for CurrencyServiceError {}

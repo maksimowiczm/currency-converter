@@ -15,3 +15,5 @@ path = "src/currency/lib.rs"
 
 [dependencies]
 async-trait = "0.1.78"
+serde_json = "1.0.114"
+serde = { version = "1.0.197", features = ["derive"] }
