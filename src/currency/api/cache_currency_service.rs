@@ -70,3 +70,85 @@ impl CurrencyService for CacheCurrencyService {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::cache::cache::MockCache;
+    use crate::currency_service::MockCurrencyService;
+    use maplit::hashmap;
+    use mockall::predicate;
+
+    const BASE_CURRENCY: &str = "USD";
+
+    #[tokio::test]
+    async fn get_exchange_rates_use_cached_value_if_available() {
+        let mut cache_mock = MockCache::new();
+        let cached = r#"{"PLN":4.1,"EUR":0.9}"#.to_string();
+        cache_mock
+            .expect_get()
+            .with(predicate::eq(BASE_CURRENCY.to_string()))
+            .times(1)
+            .returning(move |_| Ok(Some(cached.clone())));
+        let mut currency_service_mock = MockCurrencyService::new();
+        currency_service_mock.expect_get_exchange_rates().never();
+        let cache_service =
+            CacheCurrencyService::new(Box::new(cache_mock), Box::new(currency_service_mock));
+
+        let result = cache_service.get_exchange_rates(BASE_CURRENCY).await;
+
+        assert!(result.is_ok());
+        let result = result.unwrap();
+
+        let pln = result.get("PLN").unwrap();
+        assert_eq!(*pln, 4.1f64);
+
+        let eur = result.get("EUR").unwrap();
+        assert_eq!(*eur, 0.9f64)
+    }
+
+    #[tokio::test]
+    async fn get_exchange_rates_calls_wrapped_if_not_cached_and_stored_value_in_cache() {
+        let mut cache_mock = MockCache::new();
+        cache_mock
+            .expect_get()
+            .with(predicate::eq(BASE_CURRENCY.to_string()))
+            .times(1)
+            .returning(move |_| Ok(None));
+
+        let mut currency_service_mock = MockCurrencyService::new();
+        let map = hashmap! {
+            "PLN".to_string() => 4.1,
+            "EUR".to_string() => 0.9,
+        };
+        let json_map = serde_json::to_string(&map).unwrap();
+        currency_service_mock
+            .expect_get_exchange_rates()
+            .with(predicate::eq(BASE_CURRENCY.to_string()))
+            .times(1)
+            .returning(move |_| Ok(map.clone()));
+
+        cache_mock
+            .expect_set()
+            .with(
+                predicate::eq(BASE_CURRENCY.to_string()),
+                predicate::eq(json_map),
+            )
+            .times(1)
+            .returning(move |_, _| Ok(()));
+
+        let cache_service =
+            CacheCurrencyService::new(Box::new(cache_mock), Box::new(currency_service_mock));
+
+        let result = cache_service.get_exchange_rates(BASE_CURRENCY).await;
+
+        assert!(result.is_ok());
+        let result = result.unwrap();
+
+        let pln = result.get("PLN").unwrap();
+        assert_eq!(*pln, 4.1f64);
+
+        let eur = result.get("EUR").unwrap();
+        assert_eq!(*eur, 0.9f64)
+    }
+}

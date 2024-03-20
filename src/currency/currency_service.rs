@@ -1,8 +1,10 @@
 use async_trait::async_trait;
+use mockall::automock;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+#[automock]
 #[async_trait]
 pub trait CurrencyService: Send + Sync {
     async fn get_currency_exchange_rate(
