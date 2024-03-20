@@ -18,6 +18,8 @@ you can build your own image.
 ```sh
 $ docker build . -t maksimowiczm/currency-converter
 ```
+API key can be provided with **--api-key** option or via environmental variable **CURRENCY_API_KEY**.
+You can also enable logging with **RUST_LOG** environmental variable.
 
 You can perform specific exchange rate lookups and convert given amounts.
 
@@ -72,14 +74,15 @@ $ docker-compose up -d
 **2. Environment Variables**
 
 Set the connection string for Redis server using the **REDIS_URL** environmental variable.
-You can track cache reads and writes enabling logger with **RUST_LOG** enviromental variable.
+You can track cache reads and writes enabling logger with **RUST_LOG=info** enviromental variable.
 
 **3. Example usage**
 
 ```sh
 $ docker run --rm --network maksimowiczm-currency \
--e RUST_LOG=info -e REDIS_URL=redis://cache:6379 maksimowiczm/currency-converter \
---api-key <API_KEY> USD
+-e RUST_LOG=info -e REDIS_URL=redis://cache:6379 \
+-e CURRENCY_API_KEY <API_KEY> \
+maksimowiczm/currency-converter USD
 
 [INFO  currency_converter] Using Redis as cache service
 [INFO  currency::api::cache_currency_service] Cache miss with key = "USD-PLN"
@@ -89,8 +92,9 @@ $ docker run --rm --network maksimowiczm-currency \
 
 # run again with same Redis server
 $ docker run --rm --network maksimowiczm-currency \
--e RUST_LOG=info -e REDIS_URL=redis://cache:6379 maksimowiczm/currency-converter \
---api-key <API_KEY> USD
+-e RUST_LOG=info -e REDIS_URL=redis://cache:6379 \
+-e CURRENCY_API_KEY <API_KEY> \
+maksimowiczm/currency-converter USD
 
 [INFO  currency_converter] Using Redis as cache service
 [INFO  currency::api::cache_currency_service] Cache hit with key = "USD-PLN"
@@ -101,7 +105,7 @@ $ docker run --rm --network maksimowiczm-currency \
 ### CLI Manual
 
 ```
-Usage: currency-converter --api-key <API_KEY> <SOURCE_CURRENCY_CODE> [ <TARGET_CURRENCY_CODE> <AMOUNT> ]
+Usage: currency-converter [ --api-key <API_KEY> ] <SOURCE_CURRENCY_CODE> [ <TARGET_CURRENCY_CODE> <AMOUNT> ]
 
 Arguments:
   <SOURCE_CURRENCY_CODE>  Source currency code

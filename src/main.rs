@@ -15,7 +15,7 @@ use std::env;
 struct Arguments {
     /// API key used for authentication
     #[arg(long)]
-    api_key: String,
+    api_key: Option<String>,
 
     /// Source currency code
     source_currency_code: Option<String>,
@@ -51,7 +51,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let service = setup_service(args.api_key).await?;
+    let api_key = args
+        .api_key
+        .or_else(|| env::var("CURRENCY_API_KEY").ok())
+        .ok_or("You have to provide API key")?;
+
+    let service = setup_service(api_key).await?;
     let result = command.execute(service).await?;
 
     println!("{result}");
@@ -88,7 +93,7 @@ async fn setup_service(
             Err(_) => {
                 info!("Using cacheless service");
                 service
-            },
+            }
         }
     } else {
         info!("Using cacheless service");
