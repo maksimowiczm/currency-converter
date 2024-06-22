@@ -3,5 +3,10 @@ name = "currency-converter-v2"
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+members = [
+    "currency-api",
+]
+
 [dependencies]
 currency-api = { path = "./currency-api" }
