@@ -9,6 +9,8 @@ members = [
 ]
 
 [dependencies]
+tokio = { version = "1.38.0", features = ["rt", "rt-multi-thread", "macros"] }
+clap = { version = "4.5.7", features = ["derive"] }
 currency-api = { path = "./currency-api" }
 serde = { version = "1.0.203", features = ["derive"] }
 async-trait = "0.1.80"
