@@ -1,21 +1,22 @@
 use derive_more::FromStr;
 use serde::Deserialize;
+use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Deserialize, FromStr)]
-#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Deserialize, FromStr, Clone)]
 pub struct CurrencyCode {
     code: String,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct Currency {
-    symbol: String,
-    name: String,
-    symbol_native: String,
-    decimal_digits: i32,
-    rounding: i32,
-    code: CurrencyCode,
-    name_plural: String,
+impl Display for CurrencyCode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.code.to_uppercase())
+    }
+}
+
+impl PartialEq for CurrencyCode {
+    fn eq(&self, other: &Self) -> bool {
+        self.code.eq_ignore_ascii_case(&other.code)
+    }
 }
 
 #[derive(Debug)]
@@ -24,19 +25,11 @@ pub struct ExchangeRates {
     pub(crate) rates: Vec<(CurrencyCode, f64)>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct Status {
-    quotas: Quotas,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Month {
-    total: i64,
-    used: i64,
-    remaining: i64,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Quotas {
-    month: Month,
+impl ExchangeRates {
+    pub fn get_rate(&self, target: &CurrencyCode) -> Option<f64> {
+        self.rates
+            .iter()
+            .find(|(currency, _)| currency == target)
+            .map(|(_, rate)| *rate)
+    }
 }
