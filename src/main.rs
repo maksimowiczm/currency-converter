@@ -1,7 +1,9 @@
-use crate::currency_client::CurrencyClient;
+use crate::currency_client::{CurrencyClient, CurrencyClientError};
 use crate::currency_service::CurrencyService;
 use crate::models::CurrencyCode;
 use clap::Parser;
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter};
 
 mod currency_client;
 mod currency_service;
@@ -24,7 +26,7 @@ struct Arguments {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), CliError> {
     let args = Arguments::parse();
 
     let api_key = args.api_key.or_else(|| std::env::var("CURRENCY_API_KEY").ok())
@@ -33,15 +35,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         });
 
-    let client = CurrencyClient::from_api_key(api_key)?;
+    let client = CurrencyClient::from_api_key(api_key).map_err(|err| CliError(err))?;
 
-    let base: CurrencyCode = args.source_currency_code.parse()?;
-    let target: CurrencyCode = args.target_currency_code.parse()?;
-    let exchange_rates = {
-        let target = target.clone();
-        client.get_exchange_rates(base, &[target]).await?
-    };
+    // parse will never fail because it wraps a string
+    let base: CurrencyCode = args
+        .source_currency_code
+        .parse()
+        .expect("Invalid base currency code");
+    let target: CurrencyCode = args
+        .target_currency_code
+        .parse()
+        .expect("Invalid target currency code");
 
+    let exchange_rates = client
+        .get_exchange_rates(base, &[target.clone()])
+        .await
+        .map_err(|err| CliError(err))?;
+
+    // calculate the converted amount
     let rate = exchange_rates.get_rate(&target).unwrap_or_else(|| {
         eprintln!("Exchange rate for {target} not found.");
         std::process::exit(2);
@@ -51,4 +62,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{converted_amount} {rate}");
 
     Ok(())
+}
+
+
+struct CliError(CurrencyClientError<reqwest::Error>);
+
+impl Debug for CliError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
+impl Error for CliError {}
+
+impl Display for CliError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self.0 {
+            CurrencyClientError::ValidationError(err) => {
+                let mut parts = vec![];
+
+                if !err.errors.currencies_error() {
+                    parts.push("Invalid target currency code".to_string());
+                }
+
+                if !err.errors.base_currency_error() {
+                    parts.push("Invalid base currency code".to_string());
+                }
+
+                write!(f, "{}", parts.join(", "))
+            }
+            CurrencyClientError::ApiKeyInvalid => write!(f, "Invalid authentication credentials"),
+            _ => write!(f, "{}", self.0),
+        }
+    }
 }

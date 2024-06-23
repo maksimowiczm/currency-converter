@@ -80,6 +80,7 @@ impl CurrencyService<CurrencyClientError<reqwest::Error>> for CurrencyClient {
             422 => deserialize_response::<ErrorResponse>(response)
                 .await
                 .and_then(|body| Err(CurrencyClientError::ValidationError(body))),
+            401 => Err(CurrencyClientError::ApiKeyInvalid),
             _ => {
                 // no idea how to make it pretty code without unreachable :/
                 response
@@ -103,14 +104,10 @@ async fn deserialize_response<T: DeserializeOwned>(
 }
 
 #[derive(Deserialize, Display)]
-#[display(
-    fmt = "{:?}, {}",
-    errors,
-    info
-)]
+#[display(fmt = "{:?}, {}", errors, info)]
 pub struct ErrorResponse {
     message: String,
-    errors: Errors,
+    pub errors: Errors,
     info: String,
 }
 
@@ -123,10 +120,21 @@ pub struct Errors {
     base_currency: Vec<String>,
 }
 
+impl Errors {
+    pub fn base_currency_error(&self) -> bool {
+        !self.base_currency.is_empty()
+    }
+
+    pub fn currencies_error(&self) -> bool {
+        !self.currencies.is_empty()
+    }
+}
+
 pub enum CurrencyClientError<TError> {
     HeaderCreationError(String),
     ClientBuildError(TError),
     HttpRequestError(TError),
+    ApiKeyInvalid,
     ValidationError(ErrorResponse),
     SerializationError(TError),
 }
@@ -151,6 +159,9 @@ impl Display for CurrencyClientError<reqwest::Error> {
             }
             CurrencyClientError::ValidationError(err) => {
                 write!(f, "Validation error: {}", err)
+            }
+            CurrencyClientError::ApiKeyInvalid => {
+                write!(f, "API key is invalid")
             }
         }
     }
