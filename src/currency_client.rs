@@ -1,7 +1,9 @@
 use crate::currency_service::CurrencyService;
 use crate::models::{CurrencyCode, ExchangeRates};
 use async_trait::async_trait;
-use reqwest::Client;
+use derive_more::Display;
+use reqwest::{Client, Response};
+use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use std::error::Error;
 use std::fmt;
@@ -28,12 +30,10 @@ impl CurrencyClient {
         );
         headers.insert(
             "Content-Type",
-            "application/json".parse().map_err(|err| {
-                CurrencyClientError::HeaderCreationError(format!(
-                    "Content-Type header creation error: {}",
-                    err
-                ))
-            })?,
+            // unwrap is safe here because the string is hardcoded
+            "application/json"
+                .parse()
+                .expect("Content-Type header creation error"),
         );
 
         let client = reqwest::ClientBuilder::new()
@@ -73,21 +73,61 @@ impl CurrencyService<CurrencyClientError<reqwest::Error>> for CurrencyClient {
             .get(&url)
             .send()
             .await
-            .map_err(|err| CurrencyClientError::RequestError(err))?
-            .error_for_status()
-            .map_err(|err| CurrencyClientError::RequestError(err))?
-            .json::<ExchangeRatesWrapper>()
-            .await
-            .map_err(|err| CurrencyClientError::SerializationError(err))?;
+            .map_err(|err| CurrencyClientError::HttpRequestError(err))?;
+
+        let response = match response.status().as_u16() {
+            200 => deserialize_response::<ExchangeRatesWrapper>(response).await,
+            422 => deserialize_response::<ErrorResponse>(response)
+                .await
+                .and_then(|body| Err(CurrencyClientError::ValidationError(body))),
+            _ => {
+                // no idea how to make it pretty code without unreachable :/
+                response
+                    .error_for_status()
+                    .map_err(|err| CurrencyClientError::HttpRequestError(err))?;
+                unreachable!()
+            }
+        }?;
 
         Ok(response.data)
     }
 }
 
+async fn deserialize_response<T: DeserializeOwned>(
+    response: Response,
+) -> Result<T, CurrencyClientError<reqwest::Error>> {
+    response
+        .json::<T>()
+        .await
+        .map_err(CurrencyClientError::SerializationError)
+}
+
+#[derive(Deserialize, Display)]
+#[display(
+    fmt = "{:?}, {}",
+    errors,
+    info
+)]
+pub struct ErrorResponse {
+    message: String,
+    errors: Errors,
+    info: String,
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(dead_code)]
+pub struct Errors {
+    #[serde(default)]
+    currencies: Vec<String>,
+    #[serde(default)]
+    base_currency: Vec<String>,
+}
+
 pub enum CurrencyClientError<TError> {
     HeaderCreationError(String),
     ClientBuildError(TError),
-    RequestError(TError),
+    HttpRequestError(TError),
+    ValidationError(ErrorResponse),
     SerializationError(TError),
 }
 
@@ -95,6 +135,7 @@ impl Error for CurrencyClientError<reqwest::Error> {}
 
 impl Display for CurrencyClientError<reqwest::Error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Currency client error, ")?;
         match self {
             CurrencyClientError::HeaderCreationError(err) => {
                 write!(f, "Header creation error: {}", err)
@@ -102,11 +143,14 @@ impl Display for CurrencyClientError<reqwest::Error> {
             CurrencyClientError::ClientBuildError(err) => {
                 write!(f, "Client build error: {}", err)
             }
-            CurrencyClientError::RequestError(err) => {
+            CurrencyClientError::HttpRequestError(err) => {
                 write!(f, "Request error: {}", err)
             }
             CurrencyClientError::SerializationError(err) => {
                 write!(f, "Serialization error: {}", err)
+            }
+            CurrencyClientError::ValidationError(err) => {
+                write!(f, "Validation error: {}", err)
             }
         }
     }
