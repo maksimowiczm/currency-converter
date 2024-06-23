@@ -1,18 +1,12 @@
-use derive_more::FromStr;
+use derive_more::{Display, FromStr};
 use serde::Deserialize;
-use std::fmt::{Display, Formatter};
 
 mod cereal;
 
-#[derive(Debug, Deserialize, FromStr, Clone)]
+#[derive(Debug, Deserialize, FromStr, Clone, Display)]
+#[display(fmt = "{}", "code.to_uppercase()")]
 pub struct CurrencyCode {
     code: String,
-}
-
-impl Display for CurrencyCode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.code.to_uppercase())
-    }
 }
 
 impl PartialEq for CurrencyCode {
