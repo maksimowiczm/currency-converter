@@ -27,7 +27,7 @@ impl<'de> Deserialize<'de> for ExchangeRates {
                     rates.push((currency_symbol, rate));
                 }
 
-                Ok(ExchangeRates { rates })
+                Ok(ExchangeRates::new(rates))
             }
         }
 

@@ -1,6 +1,6 @@
+use crate::currency_service::CurrencyService;
+use crate::models::{CurrencyCode, ExchangeRates};
 use async_trait::async_trait;
-use currency_api::client::CurrencyApiClient;
-use currency_api::models::{CurrencyCode, ExchangeRates};
 use reqwest::Client;
 use serde::Deserialize;
 use std::error::Error;
@@ -8,19 +8,19 @@ use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Debug)]
-pub struct ApiClient {
+pub struct CurrencyClient {
     client: Client,
 }
 
-impl ApiClient {
+impl CurrencyClient {
     pub(crate) fn from_api_key(
         api_key: String,
-    ) -> Result<ApiClient, ApiClientError<reqwest::Error>> {
+    ) -> Result<CurrencyClient, CurrencyClientError<reqwest::Error>> {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             "apikey",
             api_key.parse().map_err(|err| {
-                ApiClientError::HeaderCreationError(format!(
+                CurrencyClientError::HeaderCreationError(format!(
                     "API key header creation error: {}",
                     err
                 ))
@@ -29,7 +29,7 @@ impl ApiClient {
         headers.insert(
             "Content-Type",
             "application/json".parse().map_err(|err| {
-                ApiClientError::HeaderCreationError(format!(
+                CurrencyClientError::HeaderCreationError(format!(
                     "Content-Type header creation error: {}",
                     err
                 ))
@@ -39,19 +39,19 @@ impl ApiClient {
         let client = reqwest::ClientBuilder::new()
             .default_headers(headers)
             .build()
-            .map_err(|err| ApiClientError::ClientBuildError(err))?;
+            .map_err(|err| CurrencyClientError::ClientBuildError(err))?;
 
-        Ok(ApiClient { client })
+        Ok(CurrencyClient { client })
     }
 }
 
 #[async_trait]
-impl CurrencyApiClient<ApiClientError<reqwest::Error>> for ApiClient {
+impl CurrencyService<CurrencyClientError<reqwest::Error>> for CurrencyClient {
     async fn get_exchange_rates(
         &self,
         base: CurrencyCode,
         target: &[CurrencyCode],
-    ) -> Result<ExchangeRates, ApiClientError<reqwest::Error>> {
+    ) -> Result<ExchangeRates, CurrencyClientError<reqwest::Error>> {
         #[derive(Deserialize)]
         struct ExchangeRatesWrapper {
             data: ExchangeRates,
@@ -73,46 +73,46 @@ impl CurrencyApiClient<ApiClientError<reqwest::Error>> for ApiClient {
             .get(&url)
             .send()
             .await
-            .map_err(|err| ApiClientError::RequestError(err))?
+            .map_err(|err| CurrencyClientError::RequestError(err))?
             .error_for_status()
-            .map_err(|err| ApiClientError::RequestError(err))?
+            .map_err(|err| CurrencyClientError::RequestError(err))?
             .json::<ExchangeRatesWrapper>()
             .await
-            .map_err(|err| ApiClientError::SerializationError(err))?;
+            .map_err(|err| CurrencyClientError::SerializationError(err))?;
 
         Ok(response.data)
     }
 }
 
-pub enum ApiClientError<TError> {
+pub enum CurrencyClientError<TError> {
     HeaderCreationError(String),
     ClientBuildError(TError),
     RequestError(TError),
     SerializationError(TError),
 }
 
-impl Error for ApiClientError<reqwest::Error> {}
+impl Error for CurrencyClientError<reqwest::Error> {}
 
-impl Display for ApiClientError<reqwest::Error> {
+impl Display for CurrencyClientError<reqwest::Error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            ApiClientError::HeaderCreationError(err) => {
+            CurrencyClientError::HeaderCreationError(err) => {
                 write!(f, "Header creation error: {}", err)
             }
-            ApiClientError::ClientBuildError(err) => {
+            CurrencyClientError::ClientBuildError(err) => {
                 write!(f, "Client build error: {}", err)
             }
-            ApiClientError::RequestError(err) => {
+            CurrencyClientError::RequestError(err) => {
                 write!(f, "Request error: {}", err)
             }
-            ApiClientError::SerializationError(err) => {
+            CurrencyClientError::SerializationError(err) => {
                 write!(f, "Serialization error: {}", err)
             }
         }
     }
 }
 
-impl Debug for ApiClientError<reqwest::Error> {
+impl Debug for CurrencyClientError<reqwest::Error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self)
     }

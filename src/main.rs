@@ -1,9 +1,11 @@
-use crate::http::ApiClient;
+use crate::currency_client::CurrencyClient;
+use crate::currency_service::CurrencyService;
+use crate::models::CurrencyCode;
 use clap::Parser;
-use currency_api::client::CurrencyApiClient;
-use currency_api::models::CurrencyCode;
 
-mod http;
+mod currency_client;
+mod currency_service;
+mod models;
 
 #[derive(Parser, Debug)]
 struct Arguments {
@@ -25,7 +27,7 @@ struct Arguments {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Arguments::parse();
 
-    let client = ApiClient::from_api_key(args.api_key)?;
+    let client = CurrencyClient::from_api_key(args.api_key)?;
 
     let base: CurrencyCode = args.source_currency_code.parse()?;
     let target: CurrencyCode = args.target_currency_code.parse()?;

@@ -2,6 +2,8 @@ use derive_more::FromStr;
 use serde::Deserialize;
 use std::fmt::{Display, Formatter};
 
+mod cereal;
+
 #[derive(Debug, Deserialize, FromStr, Clone)]
 pub struct CurrencyCode {
     code: String,
@@ -22,10 +24,14 @@ impl PartialEq for CurrencyCode {
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct ExchangeRates {
-    pub(crate) rates: Vec<(CurrencyCode, f64)>,
+    rates: Vec<(CurrencyCode, f64)>,
 }
 
 impl ExchangeRates {
+    pub fn new(rates: Vec<(CurrencyCode, f64)>) -> Self {
+        ExchangeRates { rates }
+    }
+
     pub fn get_rate(&self, target: &CurrencyCode) -> Option<f64> {
         self.rates
             .iter()

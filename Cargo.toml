@@ -3,15 +3,14 @@ name = "currency-converter-v2"
 version = "0.1.0"
 edition = "2021"
 
-[workspace]
-members = [
-    "currency-api",
-]
-
 [dependencies]
 tokio = { version = "1.38.0", features = ["rt", "rt-multi-thread", "macros"] }
 clap = { version = "4.5.7", features = ["derive"] }
-currency-api = { path = "./currency-api" }
 serde = { version = "1.0.203", features = ["derive"] }
 async-trait = "0.1.80"
 reqwest = { version = "0.12.5", features = ["json"] }
+derive_more = "0.99.18"
+serde_json = "1.0.117"
+
+[dev-dependencies]
+serde_test = "1.0"
