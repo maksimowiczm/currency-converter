@@ -35,27 +35,27 @@ async fn main() -> Result<(), CliError> {
             std::process::exit(1);
         });
 
-    let client = CurrencyClient::from_api_key(api_key).map_err(|err| CliError(err))?;
+    let client = CurrencyClient::from_api_key(api_key).map_err(CliError)?;
 
     // parse will never fail because it wraps a string
-    let base: CurrencyCode = args
-        .source_currency_code
-        .parse()
-        .expect("Invalid base currency code");
-    let target: CurrencyCode = args
-        .target_currency_code
-        .parse()
-        .expect("Invalid target currency code");
+    let base: CurrencyCode = args.source_currency_code.parse().unwrap_or_else(|_| {
+        eprintln!("Invalid base currency code");
+        std::process::exit(2);
+    });
+    let target: CurrencyCode = args.target_currency_code.parse().unwrap_or_else(|_| {
+        eprintln!("Invalid target currency code");
+        std::process::exit(2);
+    });
 
     let exchange_rates = client
         .get_exchange_rates(base, &[target.clone()])
         .await
-        .map_err(|err| CliError(err))?;
+        .map_err(CliError)?;
 
     // calculate the converted amount
     let rate = exchange_rates.get_rate(&target).unwrap_or_else(|| {
         eprintln!("Exchange rate for {target} not found.");
-        std::process::exit(2);
+        std::process::exit(3);
     });
     let converted_amount = args.amount * rate;
 
@@ -64,8 +64,7 @@ async fn main() -> Result<(), CliError> {
     Ok(())
 }
 
-
-struct CliError(CurrencyClientError<reqwest::Error>);
+struct CliError(CurrencyClientError);
 
 impl Debug for CliError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -81,11 +80,11 @@ impl Display for CliError {
             CurrencyClientError::ValidationError(err) => {
                 let mut parts = vec![];
 
-                if !err.errors.currencies_error() {
+                if err.errors.currencies_error() {
                     parts.push("Invalid target currency code".to_string());
                 }
 
-                if !err.errors.base_currency_error() {
+                if err.errors.base_currency_error() {
                     parts.push("Invalid base currency code".to_string());
                 }
 

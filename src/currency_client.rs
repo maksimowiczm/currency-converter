@@ -6,8 +6,7 @@ use reqwest::{Client, Response};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use std::error::Error;
-use std::fmt;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::Debug;
 
 #[derive(Debug)]
 pub struct CurrencyClient {
@@ -15,43 +14,36 @@ pub struct CurrencyClient {
 }
 
 impl CurrencyClient {
-    pub(crate) fn from_api_key(
-        api_key: String,
-    ) -> Result<CurrencyClient, CurrencyClientError<reqwest::Error>> {
+    pub fn from_api_key(api_key: String) -> Result<CurrencyClient, CurrencyClientError> {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             "apikey",
-            api_key.parse().map_err(|err| {
-                CurrencyClientError::HeaderCreationError(format!(
-                    "API key header creation error: {}",
-                    err
-                ))
-            })?,
+            api_key
+                .parse()
+                .map_err(|_| CurrencyClientError::InvalidApiKeyFormat)?,
         );
         headers.insert(
             "Content-Type",
             // unwrap is safe here because the string is hardcoded
-            "application/json"
-                .parse()
-                .expect("Content-Type header creation error"),
+            "application/json".parse().unwrap(),
         );
 
         let client = reqwest::ClientBuilder::new()
             .default_headers(headers)
             .build()
-            .map_err(|err| CurrencyClientError::ClientBuildError(err))?;
+            .map_err(CurrencyClientError::ClientBuildError)?;
 
         Ok(CurrencyClient { client })
     }
 }
 
 #[async_trait]
-impl CurrencyService<CurrencyClientError<reqwest::Error>> for CurrencyClient {
+impl CurrencyService<CurrencyClientError> for CurrencyClient {
     async fn get_exchange_rates(
         &self,
         base: CurrencyCode,
         target: &[CurrencyCode],
-    ) -> Result<ExchangeRates, CurrencyClientError<reqwest::Error>> {
+    ) -> Result<ExchangeRates, CurrencyClientError> {
         #[derive(Deserialize)]
         struct ExchangeRatesWrapper {
             data: ExchangeRates,
@@ -73,7 +65,7 @@ impl CurrencyService<CurrencyClientError<reqwest::Error>> for CurrencyClient {
             .get(&url)
             .send()
             .await
-            .map_err(|err| CurrencyClientError::HttpRequestError(err))?;
+            .map_err(CurrencyClientError::RequestError)?;
 
         let response = match response.status().as_u16() {
             200 => deserialize_response::<ExchangeRatesWrapper>(response).await,
@@ -85,7 +77,7 @@ impl CurrencyService<CurrencyClientError<reqwest::Error>> for CurrencyClient {
                 // no idea how to make it pretty code without unreachable :/
                 response
                     .error_for_status()
-                    .map_err(|err| CurrencyClientError::HttpRequestError(err))?;
+                    .map_err(CurrencyClientError::ResponseError)?;
                 unreachable!()
             }
         }?;
@@ -96,14 +88,14 @@ impl CurrencyService<CurrencyClientError<reqwest::Error>> for CurrencyClient {
 
 async fn deserialize_response<T: DeserializeOwned>(
     response: Response,
-) -> Result<T, CurrencyClientError<reqwest::Error>> {
+) -> Result<T, CurrencyClientError> {
     response
         .json::<T>()
         .await
-        .map_err(CurrencyClientError::SerializationError)
+        .map_err(|_| CurrencyClientError::ResponseSerializationError)
 }
 
-#[derive(Deserialize, Display)]
+#[derive(Deserialize, Display, Debug)]
 #[display(fmt = "{:?}, {}", errors, info)]
 pub struct ErrorResponse {
     message: String,
@@ -130,45 +122,22 @@ impl Errors {
     }
 }
 
-pub enum CurrencyClientError<TError> {
-    HeaderCreationError(String),
-    ClientBuildError(TError),
-    HttpRequestError(TError),
+#[derive(Debug, Display)]
+pub enum CurrencyClientError {
+    #[display(fmt = "Invalid API key format")]
+    InvalidApiKeyFormat,
+    #[display(fmt = "Client build error: {}", _0)]
+    ClientBuildError(reqwest::Error),
+    #[display(fmt = "API key is invalid")]
     ApiKeyInvalid,
+    #[display(fmt = "Validation error: {}", _0)]
     ValidationError(ErrorResponse),
-    SerializationError(TError),
+    #[display(fmt = "Response serialization error")]
+    ResponseSerializationError,
+    #[display(fmt = "Request error: {}", _0)]
+    RequestError(reqwest::Error),
+    #[display(fmt = "Response error: {}", _0)]
+    ResponseError(reqwest::Error),
 }
 
-impl Error for CurrencyClientError<reqwest::Error> {}
-
-impl Display for CurrencyClientError<reqwest::Error> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "Currency client error, ")?;
-        match self {
-            CurrencyClientError::HeaderCreationError(err) => {
-                write!(f, "Header creation error: {}", err)
-            }
-            CurrencyClientError::ClientBuildError(err) => {
-                write!(f, "Client build error: {}", err)
-            }
-            CurrencyClientError::HttpRequestError(err) => {
-                write!(f, "Request error: {}", err)
-            }
-            CurrencyClientError::SerializationError(err) => {
-                write!(f, "Serialization error: {}", err)
-            }
-            CurrencyClientError::ValidationError(err) => {
-                write!(f, "Validation error: {}", err)
-            }
-            CurrencyClientError::ApiKeyInvalid => {
-                write!(f, "API key is invalid")
-            }
-        }
-    }
-}
-
-impl Debug for CurrencyClientError<reqwest::Error> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
-    }
-}
+impl Error for CurrencyClientError {}
